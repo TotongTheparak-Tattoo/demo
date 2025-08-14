@@ -1,0 +1,50 @@
+version: "3.9"
+
+services:
+  db:
+    image: mcr.microsoft.com/azure-sql-edge
+    container_name: sql_server
+    environment:
+      SA_PASSWORD: DmX08775416421
+      ACCEPT_EULA: "Y"
+    ports:
+      - "1433:1433"
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "/opt/mssql-tools/bin/sqlcmd", "-S", "localhost", "-U", "sa", "-P", "DmX08775416421", "-Q", "SELECT 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+    container_name: app_server
+    environment:
+      DB_USER: sa
+      DB_PASSWORD: DmX08775416421
+      DB_SERVER: sql_server
+      DB_DATABASE: autoplan
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - app-network
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: app_client
+    ports:
+      - "3001:80"
+    depends_on:
+      - backend
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
