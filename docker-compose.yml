@@ -11,6 +11,8 @@ services:
       - "1433:1433"
     networks:
       - app-network
+    volumes:
+      - mssql-data:/var/opt/mssql
     healthcheck:
       test: ["CMD", "/opt/mssql-tools/bin/sqlcmd", "-S", "localhost", "-U", "sa", "-P", "DmX08775416421", "-Q", "SELECT 1"]
       interval: 10s
@@ -44,6 +46,9 @@ services:
       - backend
     networks:
       - app-network
+
+volumes:
+  mssql-data:
 
 networks:
   app-network:
