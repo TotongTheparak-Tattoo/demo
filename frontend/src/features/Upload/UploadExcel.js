@@ -73,7 +73,7 @@ export default function UploadPlanningPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${topic}_template.csv`;
+    a.download = `${topic}.csv`;
     document.body.appendChild(a);
     a.click();
     a.remove();
