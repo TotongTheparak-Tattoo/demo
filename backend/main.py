@@ -1310,7 +1310,7 @@ async def upload_monthy_files(
         #find bomwos
         bom_wos_obj = db.query(BomWos).filter(BomWos.brgNoValue == brgNoValue).first()
         if not bom_wos_obj:
-            failed_rows_BalanceOrderMidSmall.append({"row": row + 2, "reason": f"wosNo '{brgNoValue}' not found in BomWos"})
+            inserted_rows_ProductionPlan.append({"row": row, "reason": f"wosNo '{brgNoValue}' not found in BomWos"})
             continue
 
         #find machineLayout.id
@@ -1824,8 +1824,8 @@ def get_plan_target(rev: int | None = None, db: Session = Depends(get_db)):
     if max_rev is None:
         return []
 
-    y = func.strftime('%Y', ApproveDataPlan.workingDate)
-    m = func.strftime('%m', ApproveDataPlan.workingDate)
+    y = extract('year', ApproveDataPlan.workingDate)
+    m = extract('month', ApproveDataPlan.workingDate)
 
     rows = (
         db.query(
@@ -1859,8 +1859,8 @@ async def Insert_actual_assy_records(file: UploadFile = File(...), db: Session =
     contents = await file.read()
     
     # #check file name
-    if not checkfilename(file.filename, "actualAssy"):
-        raise  HTTPException(status_code=400, detail="Filename must start with 'bomWos'")
+    if not checkfilename(file.filename, "productionPlanActual"):
+        raise  HTTPException(status_code=400, detail="Filename must start with 'productionPlanActual'")
     
     #check file type
     if not checkfiletype(file.filename) :
@@ -1876,7 +1876,7 @@ async def Insert_actual_assy_records(file: UploadFile = File(...), db: Session =
     df = df.loc[:, ~df.columns.str.contains("^Unnamed")]
 
     # #check header
-    is_valid, message = checkheader(df, "actualassy")
+    is_valid, message = checkheader(df, "productionPlanActual")
     if not is_valid:
         raise HTTPException(status_code=400, detail=message)
     
@@ -1909,7 +1909,7 @@ async def Insert_actual_assy_records(file: UploadFile = File(...), db: Session =
         machineNo = row.get("machineNo")
         brgNoValue = row.get("brgNoValue")
         startDate = row.get("startDate")
-        endDate = row.get("balanceOrder")
+        endDate = row.get("endDate")
         actualOutput = row.get("actualOutput")
 
         #find bomwos
@@ -1921,7 +1921,7 @@ async def Insert_actual_assy_records(file: UploadFile = File(...), db: Session =
         #find machineLayout.id
         machine_layout_obj = db.query(MachineLayout).filter(MachineLayout.machineNo == machineNo).first()
         if not machine_layout_obj:
-            print(f"❌ MachineType not found for machineNo: {machineNo}")
+            print(f"❌ machineLayout not found for machineNo: {machineNo}")
             continue
 
         #find machine.id
@@ -1931,7 +1931,7 @@ async def Insert_actual_assy_records(file: UploadFile = File(...), db: Session =
             continue       
 
         #insert new record
-        new_layout = BalanceOrderMidSmall(
+        new_layout = ProductionPlanActual(
             rev=rev,
             startDate=startDate,
             endDate=endDate,

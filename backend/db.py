@@ -6,7 +6,7 @@ import os
 # ✅ อ่านจาก environment variable (แก้ไขง่าย และปลอดภัย)
 DB_USER = os.getenv("DB_USER", "sa")
 DB_PASSWORD = os.getenv("DB_PASSWORD", "DmX08775416421")
-DB_SERVER = os.getenv("DB_SERVER", "localhost")     # ใน docker-compose service ชื่อ db
+DB_SERVER = os.getenv("DB_SERVER", "db")     # ใน docker-compose service ชื่อ db
 DB_NAME = os.getenv("DB_NAME", "autoplan_nmb")
 DB_DRIVER = os.getenv("DB_DRIVER", "ODBC+Driver+17+for+SQL+Server")
 

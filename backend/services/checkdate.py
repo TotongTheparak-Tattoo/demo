@@ -1,4 +1,5 @@
 import math
+import re
 import pandas as pd
 from typing import List, Tuple
 from datetime import datetime, date, timedelta
@@ -6,14 +7,12 @@ from datetime import datetime, date, timedelta
 def checkdate(
     df: pd.DataFrame,
     date_columns: List[str],
-    cast_to_date: bool = True,          # True = บีบให้เป็น date (ไม่มีเวลา)
-    allow_excel_serial: bool = True     # True = รองรับเลขแบบ Excel serial
+    cast_to_date: bool = False,         # ← ถ้า column DB เป็น DATETIME ให้ False, ถ้าเป็น DATE ให้ True
+    allow_excel_serial: bool = True
 ) -> Tuple[bool, str]:
     """
-    ตรวจรูปแบบวันที่ในคอลัมน์ที่กำหนด และ (โดยดีฟอลต์) แปลงเป็นชนิดวันที่จริง
-    คืนค่า: (is_ok, message)
-    - ถ้า is_ok=True: df[col] ถูกแปลงเป็น date หรือ datetime แล้ว
-    - ถ้า is_ok=False: message จะบอกแถว/คอลัมน์/ค่าที่ผิด
+    ตรวจและแปลงคอลัมน์วันที่ให้เป็นชนิดจริง (date/datetime)
+    คืนค่า (is_ok, message) และเขียนค่าที่แปลงแล้วกลับเข้า df[col]
     """
 
     accepted_formats = [
@@ -21,6 +20,9 @@ def checkdate(
         "%d/%m/%Y",
         "%Y-%m-%d %H:%M",
         "%Y-%m-%d",
+        # เพิ่มตรงนี้ถ้าคุณใช้ %Y/%m/%d บ่อย
+        "%Y/%m/%d %H:%M",
+        "%Y/%m/%d",
     ]
 
     def parse_one(v):
@@ -32,20 +34,33 @@ def checkdate(
             return pd.to_datetime(v)
 
         # Excel serial number (เช่น 45500.5)
-        if allow_excel_serial and isinstance(v, (int, float)) and not math.isnan(float(v)):
-            base = datetime(1899, 12, 30)  # Excel (Windows) base
-            return pd.to_datetime(base + timedelta(days=float(v)))
+        if allow_excel_serial and isinstance(v, (int, float)):
+            try:
+                fv = float(v)
+                if math.isnan(fv):
+                    raise ValueError("is NaN")
+                base = datetime(1899, 12, 30)  # Excel base (Windows)
+                return pd.to_datetime(base + timedelta(days=fv))
+            except Exception:
+                pass
 
         s = str(v).strip()
+
+        # ถ้าเป็นรูปแบบ year-first ชัดเจน (เช่น 2025/10/15), ปิด dayfirst เพื่อกัน warning
+        if re.match(r"^\d{4}[/\-]\d{1,2}[/\-]\d{1,2}(\s+\d{1,2}:\d{2})?$", s):
+            try:
+                return pd.to_datetime(s, dayfirst=False, errors="raise")
+            except Exception:
+                pass
 
         # ลองตามรูปแบบที่กำหนด
         for fmt in accepted_formats:
             try:
                 return pd.to_datetime(datetime.strptime(s, fmt))
             except ValueError:
-                pass
+                continue
 
-        # กันเคสที่ยัง parse ไม่ได้ แต่เป็น dd/mm/yyyy ทั่วไป
+        # สุดท้ายลอง dayfirst=True (รองรับ dd/mm/yyyy)
         try:
             return pd.to_datetime(s, dayfirst=True, errors="raise")
         except Exception:
@@ -56,19 +71,19 @@ def checkdate(
             return False, f"Missing date column: '{col}'"
 
         parsed = []
-        # ใช้ enumerate เพื่อให้ row number เป็น 1-based ตามลำดับแถวใน DataFrame
-        for row_pos, v in enumerate(df[col].tolist(), start=1):
+        # ใช้ enumerate เริ่ม 2 เพื่ออ้างแถวแบบ Excel (เผื่อ header 1 แถว)
+        for row_pos, v in enumerate(df[col].tolist(), start=2):
             try:
                 dt = parse_one(v)
                 parsed.append(dt)
             except ValueError as e:
                 return False, f"[Row {row_pos}] Column '{col}': {e}"
 
-    # แปลงให้เป็น Series แล้วจัด index ให้ตรงกับ df เพื่อไม่ให้ค่าเหลื่อม
-    ser = pd.to_datetime(pd.Series(parsed), errors="raise")
-    if cast_to_date:
-        df[col] = pd.Series(ser.dt.date, index=df.index)
-    else:
-        df[col] = pd.Series(ser, index=df.index)
+        # >>> ต้องอยู่ 'ใน' ลูปเสมอ <<<
+        ser = pd.to_datetime(pd.Series(parsed), errors="raise")
+        if cast_to_date:
+            df[col] = pd.Series(ser.dt.date, index=df.index)   # เป็น datetime.date
+        else:
+            df[col] = pd.Series(ser, index=df.index)           # เป็น pandas.Timestamp
 
     return True, "All date values are valid and normalized"

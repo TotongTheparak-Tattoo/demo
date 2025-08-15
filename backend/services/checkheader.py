@@ -14,7 +14,7 @@ actualassy = ["machineNo","brgNoValue","startDate","endDate","actualOutput"]
 toolLimitAndCapa = ["brgNoValue","groupBrgNoValue","machineGroup","machineType","machineNo","groupBrgAndMcGroup","limitByType","limitByGroup","joinToolingPartNo","capaDay","utilizeMc","cycleTime","capaF3"]
 workingDate = ["workingDate","workingHr"]
 wipAssy = ["updateAt","brgNoValue","wosNo","processValue","qty","wipType"]
-# productionPlanActual = ["brgNoValue","machineNo","workingDate","actualOutput"]
+productionPlanActual = ["brgNoValue","machineNo","startDate","endDate","actualOutput"]
 # รวมทั้งหมดไว้ใน dictionary
 HEADER_RULES = {
     "bomWos": bomWos,
@@ -28,7 +28,7 @@ HEADER_RULES = {
     "machineLayout": machineLayout,
     "machineNotAvailable": machineNotAvailable,
     "productionPlan": productionPlan,
-    # "productionPlanActual": productionPlanActual,
+    "productionPlanActual": productionPlanActual,
     "actualassy": actualassy,
     "toolLimitAndCapa": toolLimitAndCapa,
     "workingDate": workingDate,

@@ -12,6 +12,7 @@ import {
   Button,
   Divider,
   Toolbar,
+  TableContainer,
 } from "@mui/material";
 import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, Legend } from "recharts";
 
@@ -201,41 +202,49 @@ export default function Dashboard() {
       <Typography sx={{ fontWeight: "bold", mb: 1 }}>
         SUMMARY (ต่อวัน)
       </Typography>
-      <Paper variant="outlined" sx={{ p: 2 }}>
-        <Table size="small">
-          <TableHead>
-            <TableRow>
-              <TableCell sx={{ fontWeight: "bold" }}>DATE</TableCell>
-              <TableCell sx={{ fontWeight: "bold" }} align="right">
-                PLAN QTY
-              </TableCell>
-              <TableCell sx={{ fontWeight: "bold" }} align="right">
-                ACTUAL QTY
-              </TableCell>
-              <TableCell sx={{ fontWeight: "bold" }} align="right">
-                DIF (ACT-PLAN)
-              </TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {tableRows.map((r, i) => (
-              <TableRow key={`${r.mfgDate}-${i}`}>
-                <TableCell>{r.mfgDate}</TableCell>
-                <TableCell align="right">{fmtInt(r.planQty)}</TableCell>
-                <TableCell align="right">{fmtInt(r.actualQty)}</TableCell>
-                <TableCell align="right">{fmtInt(r.difQty)}</TableCell>
-              </TableRow>
-            ))}
 
-            {tableRows.length === 0 && (
+      <Paper variant="outlined" sx={{ p: 0 }}>
+        <TableContainer
+          sx={{
+            maxHeight: 360,            // ปรับความสูงที่ต้องการให้สกรอลล์
+            overflowY: "auto",
+            // ให้หัวตารางอ่านง่ายเวลาติดบน
+            "& .MuiTableCell-stickyHeader": {
+              backgroundColor: "background.paper",
+              fontWeight: "bold",
+              zIndex: 1,
+            },
+          }}
+        >
+          <Table stickyHeader size="small">
+            <TableHead>
               <TableRow>
-                <TableCell colSpan={4} align="center" sx={{ py: 3 }}>
-                  <em>No data</em>
-                </TableCell>
+                <TableCell>DATE</TableCell>
+                <TableCell align="right">PLAN QTY</TableCell>
+                <TableCell align="right">ACTUAL QTY</TableCell>
+                <TableCell align="right">DIF (ACT-PLAN)</TableCell>
               </TableRow>
-            )}
-          </TableBody>
-        </Table>
+            </TableHead>
+            <TableBody>
+              {tableRows.map((r, i) => (
+                <TableRow key={`${r.mfgDate}-${i}`}>
+                  <TableCell>{r.mfgDate}</TableCell>
+                  <TableCell align="right">{fmtInt(r.planQty)}</TableCell>
+                  <TableCell align="right">{fmtInt(r.actualQty)}</TableCell>
+                  <TableCell align="right">{fmtInt(r.difQty)}</TableCell>
+                </TableRow>
+              ))}
+
+              {tableRows.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={4} align="center" sx={{ py: 3 }}>
+                    <em>No data</em>
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
       </Paper>
     </Box>
   );

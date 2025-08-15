@@ -660,7 +660,6 @@ export default function Report() {
                       <TableCell sx={{ fontWeight: "bold" }}>BRG</TableCell>
                       <TableCell sx={{ fontWeight: "bold" }}>Working Date</TableCell>
                       <TableCell sx={{ fontWeight: "bold" }}>Plan Type</TableCell>
-                      <TableCell sx={{ fontWeight: "bold" }}>Is Continue</TableCell>
                       <TableCell sx={{ fontWeight: "bold" }} align="right">Plan Target</TableCell>
                       {dayColsH.map((d) => (
                         <TableCell key={`phead-${d}`} align="center" sx={{ fontWeight: "bold" }}>
@@ -677,7 +676,6 @@ export default function Report() {
                         <TableCell>{row.brgNoValue ?? ""}</TableCell>
                         <TableCell>{String(row.workingDate ?? "")}</TableCell>
                         <TableCell>{row.planType ?? ""}</TableCell>
-                        <TableCell>{String(row.isMachineContinue)}</TableCell>
                         <TableCell align="right">{numberFmt(row.planTarget)}</TableCell>
 
                         {dayColsH.map((d) => {
