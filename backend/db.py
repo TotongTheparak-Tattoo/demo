@@ -28,7 +28,7 @@ try:
 except Exception as e:
     print(f"❌ Failed to connect to master DB or create database: {e}")
 
-engine = create_engine(DATABASE_URL,fast_executemany=True, connect_args={"timeout": 30})
+engine = create_engine(DATABASE_URL, connect_args={"timeout": 30})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
