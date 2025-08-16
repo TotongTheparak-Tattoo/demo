@@ -9,7 +9,7 @@ from models import BomWos,MachineType,MachineLayout,Capacity,LimitAssy,JoinLimit
 from models import MachineNotAvailable,ProductionPlan,BalanceOrderMidSmall,PartAssy,KpiSetup,KpiProduction
 from models import WorkingDate,Divition,Role,User,Machine,DataPlan,ApproveDataPlan,WipAssy
 from pprint import pprint
-from sqlalchemy import func,extract
+from sqlalchemy import func,extract,insert, tuple_
 from sqlalchemy.orm import joinedload
 from sqlalchemy.exc import IntegrityError
 from fastapi.responses import JSONResponse
@@ -607,101 +607,148 @@ async def toolLimitAndCapa(file: UploadFile = File(...), db: Session = Depends(g
     if not is_valid:
         raise HTTPException(status_code=400, detail=message)
 
-    #INSERT
-    #loop check and insert
-    for row_index, row in enumerate(df.to_dict(orient="records")):
-        #select row with coloum
-        brgNoValue = row.get("brgNoValue")
-        groupBrgNoValue = row.get("groupBrgNoValue")
-        machineGroup = row.get("machineGroup")
-        machineType = row.get("machineType")
-        machineNo = row.get("machineNo")
-        groupBrgAndMcGroup = row.get("groupBrgAndMcGroup")
-        limitByType = row.get("limitByType")
-        limitByGroup = row.get("limitByGroup")
-        joinToolingPartNo = row.get("joinToolingPartNo")
-        capaDay = row.get("capaDay")
-        utilizeMc = row.get("utilizeMc")
-        cycleTime = row.get("cycleTime")
-        capaF3 = row.get("capaF3")
 
-        #check information complete
-        # if not all([brgNoValue, groupBrgNoValue]):
-        #     failed_rows.append({"row": row_index + 2, "reason": "Missing required data"})
-        #     continue
+    # ลดงานซ้ำ
+    df = df.drop_duplicates()
 
-        #find bomwosId
-        bom_wos_obj = db.query(BomWos).filter(BomWos.brgNoValue == brgNoValue).first()
-        #if not see alert error
-        if not bom_wos_obj:
-            failed_rows.append({"row": row_index + 2, "reason": f"brgNoValue '{brgNoValue}' not found in BomWos"})
-            failed_rows_brg.append(brgNoValue)
-            continue
-        #find id machine layout
-        machine_layout = db.query(MachineLayout).filter(MachineLayout.machineNo == machineNo).first()
-        #if not see alert error
-        if not machine_layout:
-            failed_rows.append({"row": row_index + 2, "reason": f"machineNo '{machineNo}' not found in MachineLayout"})
-            continue
-        #find id machine type
-        machine_type = db.query(MachineType).filter(MachineType.machineType == machineType).first()
-        #if not see alert error
-        if not machine_type:
-            failed_rows.append({"row": row_index + 2, "reason": f"machineType '{machineType}' not found in MachineType"})
-            continue
+    # -------------------- preload maps (คิวรีทีเดียว) --------------------
+    brg_vals = set(df["brgNoValue"].dropna().astype(str))
+    mc_nos   = set(df["machineNo"].dropna().astype(str))
+    mc_types = set(df["machineType"].dropna().astype(str))
 
-        #find Machine.id from machineGroup + machineType.id + machineLayout.id
-        machine_obj = db.query(Machine).filter(
-            Machine.machineGroup == machineGroup,
-            Machine.machineTypeId == machine_type.id,
-            Machine.machineLayoutId == machine_layout.id
-        ).first()
-        #if not see alert error
-        if not machine_obj:
-            failed_rows.append({"row": row_index + 2, "reason": "Machine not found from combination of group, type, layout"})
-            failed_rows_machine.append(machine_obj.id)
-            continue
+    # BomWos: brgNoValue -> id
+    bom_rows = db.query(BomWos.brgNoValue, BomWos.id).filter(BomWos.brgNoValue.in_(brg_vals or {"__NONE__"})).all()
+    bom_map = {b: i for b, i in bom_rows}
 
-        #find LimitAssy
-        limit_assy_obj = db.query(LimitAssy).filter(LimitAssy.limitByType == limitByType,LimitAssy.limitByGroup == limitByGroup,LimitAssy.joinToolingPartNo == joinToolingPartNo).first()
-        #if not see insert LimitAssy
-        if not limit_assy_obj:
-            limit_assy_obj = LimitAssy(limitByType=limitByType,limitByGroup=limitByGroup,joinToolingPartNo=joinToolingPartNo)
-            db.add(limit_assy_obj)
-            db.commit()
-            db.refresh(limit_assy_obj)
+    # MachineLayout: machineNo -> id
+    layout_rows = db.query(MachineLayout.machineNo, MachineLayout.id).filter(MachineLayout.machineNo.in_(mc_nos or {"__NONE__"})).all()
+    layout_map = {m: i for m, i in layout_rows}
 
+    # MachineType: machineType -> id
+    type_rows = db.query(MachineType.machineType, MachineType.id).filter(MachineType.machineType.in_(mc_types or {"__NONE__"})).all()
+    type_map = {t: i for t, i in type_rows}
 
-        #insert capacity
-        capacity = Capacity(
-            bomWosId=bom_wos_obj.id,
-            machineId=machine_obj.id,
-            groupBrgAndMcGroup=groupBrgAndMcGroup,
-            capaDay=capaDay,
-            utilizeMc=utilizeMc,
-            cycleTime=cycleTime,
-            capaF3=capaF3
+    # -------------------- เตรียมชุด Machine ที่ต้องใช้ แล้วคิวรีทีเดียว --------------------
+    need_machine_keys = set()
+    for r in df.to_dict(orient="records"):
+        mg = r.get("machineGroup")
+        t  = str(r.get("machineType", "")).strip()
+        n  = str(r.get("machineNo", "")).strip()
+        type_id   = type_map.get(t)
+        layout_id = layout_map.get(n)
+        if type_id and layout_id:
+            need_machine_keys.add( (mg, type_id, layout_id) )
+
+    machine_map = {}
+    if need_machine_keys:
+        q = db.query(Machine.machineGroup, Machine.machineTypeId, Machine.machineLayoutId, Machine.id).filter(
+            tuple_(Machine.machineGroup, Machine.machineTypeId, Machine.machineLayoutId).in_(list(need_machine_keys))
         )
-        db.add(capacity)
-        db.commit()
-        db.refresh(capacity)
-        inserted += 1
+        for mg, mt, ml, mid in q.all():
+            machine_map[(mg, mt, ml)] = mid
 
-        #find JoinLimitAssy
-        join_limit_assy = db.query(JoinLimitAssy).filter(JoinLimitAssy.capacityId == capacity.id,JoinLimitAssy.limitAssyId == limit_assy_obj.id).first()
-        #if not see insert JoinLimitAssy with Capacity.id and LimitAssy.id
-        if not join_limit_assy:
-            join_limit_assy = JoinLimitAssy(capacityId=capacity.id,limitAssyId=limit_assy_obj.id)
-            db.add(join_limit_assy)
-            db.commit()
-    print("\nFaild Rows:BomWos.id")
-    pprint(failed_rows_brg)
-    print("\nFaild Rows:Machine.id")
-    pprint(failed_rows_machine)
+    # -------------------- เตรียม LimitAssy (หาอันที่ต้องใช้) --------------------
+    need_la_keys = set()
+    for r in df.to_dict(orient="records"):
+        need_la_keys.add( (r.get("limitByType"), r.get("limitByGroup"), r.get("joinToolingPartNo")) )
+
+    # คิวรีหาอันที่มีอยู่แล้ว
+    la_map = {}
+    if need_la_keys:
+        q = db.query(
+            LimitAssy.limitByType, LimitAssy.limitByGroup, LimitAssy.joinToolingPartNo, LimitAssy.id
+        ).filter(
+            tuple_(LimitAssy.limitByType, LimitAssy.limitByGroup, LimitAssy.joinToolingPartNo).in_(list(need_la_keys))
+        )
+        for a, b, c, i in q.all():
+            la_map[(a, b, c)] = i
+
+    # เตรียมแถวที่ต้องสร้างใหม่ (ถ้ามี)
+    to_create_la = [ {"limitByType": a, "limitByGroup": b, "joinToolingPartNo": c}
+                     for (a, b, c) in need_la_keys if (a, b, c) not in la_map ]
+
+    failed_rows = []
+    pending_capacity = []
+    cap_la_keys_in_order = []  # จำคู่ key ของ LimitAssy สำหรับสร้าง Join
+
+    # -------------------- วนรอบรวบรวมแถวที่ valid --------------------
+    for i, r in enumerate(df.to_dict(orient="records"), start=2):
+        brg = str(r.get("brgNoValue", "")).strip()
+        mtype = str(r.get("machineType", "")).strip()
+        mno   = str(r.get("machineNo", "")).strip()
+        mg    = r.get("machineGroup")
+
+        bom_id    = bom_map.get(brg)
+        type_id   = type_map.get(mtype)
+        layout_id = layout_map.get(mno)
+        if not bom_id:
+            failed_rows.append({"row": i, "reason": f"brgNoValue '{brg}' not found in BomWos"})
+            continue
+        if not layout_id:
+            failed_rows.append({"row": i, "reason": f"machineNo '{mno}' not found in MachineLayout"})
+            continue
+        if not type_id:
+            failed_rows.append({"row": i, "reason": f"machineType '{mtype}' not found in MachineType"})
+            continue
+
+        machine_id = machine_map.get((mg, type_id, layout_id))
+        if not machine_id:
+            failed_rows.append({"row": i, "reason": "Machine not found from combination of group, type, layout"})
+            continue
+
+        la_key = (r.get("limitByType"), r.get("limitByGroup"), r.get("joinToolingPartNo"))
+
+        pending_capacity.append({
+            "bomWosId": bom_id,
+            "machineId": machine_id,
+            "groupBrgAndMcGroup": r.get("groupBrgAndMcGroup"),
+            "capaDay": r.get("capaDay"),
+            "utilizeMc": r.get("utilizeMc"),
+            "cycleTime": r.get("cycleTime"),
+            "capaF3": r.get("capaF3"),
+        })
+        cap_la_keys_in_order.append(la_key)
+
+    inserted = 0
+
+    # -------------------- ทำทั้งหมดในธุรกรรมเดียว --------------------
+    with db.begin():
+        # 1) สร้าง LimitAssy ที่ยังไม่มี (bulk)
+        if to_create_la:
+            db.execute(insert(LimitAssy), to_create_la)
+
+            # คิวรี id กลับมาเติม la_map
+            q2 = db.query(
+                LimitAssy.limitByType, LimitAssy.limitByGroup, LimitAssy.joinToolingPartNo, LimitAssy.id
+            ).filter(
+                tuple_(LimitAssy.limitByType, LimitAssy.limitByGroup, LimitAssy.joinToolingPartNo).in_(
+                    [(x["limitByType"], x["limitByGroup"], x["joinToolingPartNo"]) for x in to_create_la]
+                )
+            )
+            for a, b, c, i in q2.all():
+                la_map[(a, b, c)] = i
+
+        # 2) bulk insert Capacity + RETURNING id
+        cap_ids = []
+        if pending_capacity:
+            res = db.execute(insert(Capacity).returning(Capacity.id), pending_capacity)
+            cap_ids = [row[0] for row in res.fetchall()]
+            inserted = len(cap_ids)
+
+        # 3) bulk insert JoinLimitAssy (จับคู่ตามลำดับที่ insert)
+        if cap_ids:
+            join_rows = []
+            for cap_id, la_key in zip(cap_ids, cap_la_keys_in_order):
+                la_id = la_map.get(la_key)
+                if la_id:
+                    join_rows.append({"capacityId": cap_id, "limitAssyId": la_id})
+            if join_rows:
+                db.execute(insert(JoinLimitAssy), join_rows)
+
     return {
         "status": "success",
-        # "inserted": inserted,
-        # "failed_rows": failed_rows
+        "inserted": inserted,
+        "failed_rows": failed_rows
     }
 
 @app.post("/data_management/workingDate/upload/")
