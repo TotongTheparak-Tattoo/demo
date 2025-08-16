@@ -9,7 +9,7 @@ from models import BomWos,MachineType,MachineLayout,Capacity,LimitAssy,JoinLimit
 from models import MachineNotAvailable,ProductionPlan,BalanceOrderMidSmall,PartAssy,KpiSetup,KpiProduction
 from models import WorkingDate,Divition,Role,User,Machine,DataPlan,ApproveDataPlan,WipAssy
 from pprint import pprint
-from sqlalchemy import func,extract,insert,values,column,and_
+from sqlalchemy import func,extract,insert, values, column, and_
 from sqlalchemy.orm import joinedload
 from sqlalchemy.exc import IntegrityError
 from fastapi.responses import JSONResponse
@@ -30,8 +30,8 @@ Base.metadata.create_all(bind=engine)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://192.168.100.124:3001"],
-    # "","http://localhost:3000"
+    allow_origins=["http://192.168.100.124:3001","http://localhost:3000"],
+    # "http://192.168.100.124:3001","http://localhost:3000"
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -39,108 +39,167 @@ app.add_middleware(
 
 @app.post("/data_management/bomWos/upload/")
 async def bom_wos(file: UploadFile = File(...), db: Session = Depends(get_db)):
-    #variable count
-    inserted = 0
-    skipped = 0
-    inserted_rows = []
-    skipped_rows = []
+    # -------------------- เตรียมตัวแปรนับผลลัพธ์ --------------------
+    inserted = 0                       # นับจำนวนแถวที่ insert ใหม่จริง ๆ
+    skipped = 0                        # นับจำนวนแถวที่ข้าม (เจอว่ามีอยู่แล้ว)
+    # ถ้าต้องการเก็บรายการแถวจริง ๆ ให้เปิดลิสต์ 2 ตัวนี้
+    # inserted_rows = []
+    # skipped_rows = []
 
-    #read raw file
-    contents = await file.read()
-    
-    # #check file name
+    # -------------------- อ่านไฟล์และตรวจสอบ --------------------
+    contents = await file.read()       # อ่าน bytes จากไฟล์อัปโหลด
+
+    # ตรวจชื่อไฟล์ต้องขึ้นต้น bomWos
     if not checkfilename(file.filename, "bomWos"):
-        raise  HTTPException(status_code=400, detail="Filename must start with 'bomWos'")
-    
-    #check file type
-    if not checkfiletype(file.filename) :
-        raise  HTTPException(status_code=400, detail="Filetype must .csv or .xlsx")
-    
-    #read flie
+        raise HTTPException(status_code=400, detail="Filename must start with 'bomWos'")
+
+    # ตรวจชนิดไฟล์ csv/xlsx
+    if not checkfiletype(file.filename):
+        raise HTTPException(status_code=400, detail="Filetype must .csv or .xlsx")
+
+    # แปลงเป็น DataFrame
     if file.filename.endswith(".csv"):
         df = pd.read_csv(BytesIO(contents))
     else:
         df = pd.read_excel(BytesIO(contents), engine="openpyxl")
 
-    #delete coloum not header
+    # ลบคอลัมน์ Unnamed ที่หลุดมาจาก Excel
     df = df.loc[:, ~df.columns.str.contains("^Unnamed")]
 
-    # #check header
-    is_valid, message = checkheader(df, "bomWos")
-    if not is_valid:
-        raise HTTPException(status_code=400, detail=message)
-    
-    # check empty
-    is_valid, message = checkempty(df)
-    if not is_valid:
-        raise HTTPException(status_code=400, detail=message)
+    # ตรวจ schema และข้อมูล
+    ok, msg = checkheader(df, "bomWos")
+    if not ok: raise HTTPException(status_code=400, detail=msg)
 
-    #check number
-    is_valid, message = checknumber(df, ['qty'])
-    if not is_valid:
-        raise HTTPException(status_code=400, detail=message)
-    
-    # check date
-    is_valid, message = checkdate(df, ["updateAt"])
-    if not is_valid:
-        raise HTTPException(status_code=400, detail=message)
+    ok, msg = checkempty(df)
+    if not ok: raise HTTPException(status_code=400, detail=msg)
 
-    # check unknown
-    is_valid, message = checkunknown(df)
-    if not is_valid:
-        raise HTTPException(status_code=400, detail=message)
+    ok, msg = checknumber(df, ['qty'])
+    if not ok: raise HTTPException(status_code=400, detail=msg)
 
-    # insert to DB
-    for row in df.to_dict(orient="records"):
-        wos_no = row.get("wosNo")
-        brg_no = row.get("brgNoValue")
-        part_no = row.get("partNoValue")
-        part_group = row.get("partComponentGroup")
-        qty = row.get("qty")
-        parent_no = row.get("parentPartNo")
+    ok, msg = checkdate(df, ["updateAt"])
+    if not ok: raise HTTPException(status_code=400, detail=msg)
 
-        #find wosNo and brgNoValue and partNoValue and parentPartNo same
-        existing = db.query(BomWos).filter(
-            BomWos.wosNo == wos_no,
-            BomWos.brgNoValue == brg_no,
-            BomWos.partNoValue == part_no,
-            BomWos.parentPartNo == parent_no,
-            BomWos.partComponentGroup == part_group,
-            BomWos.qty == qty
-        ).first()
+    ok, msg = checkunknown(df)
+    if not ok: raise HTTPException(status_code=400, detail=msg)
 
-        #if see duplicate data skip
-        if existing:
-            skipped += 1
-            skipped_rows.append(row)
-            continue
+    # -------------------- ทำความสะอาด & ลดซ้ำตั้งแต่ต้นน้ำ --------------------
+    # เลือกเฉพาะคอลัมน์ที่เกี่ยวกับ uniqueness (ให้ตรงกับเงื่อนไขเช็กซ้ำเดิม)
+    need_cols = ["wosNo", "brgNoValue", "partNoValue", "parentPartNo", "partComponentGroup", "qty", "updateAt"]
+    df = df[need_cols].copy()
 
-        #insert data
-        new_item = BomWos(
-            wosNo=wos_no,
-            brgNoValue=brg_no,
-            partNoValue=part_no,
-            partComponentGroup=part_group,
-            qty=int(qty),
-            parentPartNo=parent_no
+    # จัดชนิดข้อมูลให้สม่ำเสมอ (กัน mismatch ตอน JOIN)
+    df["wosNo"]               = df["wosNo"].astype(str).str.strip()
+    df["brgNoValue"]          = df["brgNoValue"].astype(str).str.strip()
+    df["partNoValue"]         = df["partNoValue"].astype(str).str.strip()
+    df["parentPartNo"]        = df["parentPartNo"].astype(str).str.strip()
+    df["partComponentGroup"]  = df["partComponentGroup"].astype(str).str.strip()
+    df["qty"]                 = pd.to_numeric(df["qty"]).astype(int)  # ให้ตรงกับ DB (int)
+    # updateAt เก็บไว้ถ้าคุณต้องการใช้ต่อ (ตอนนี้ schema ไม่ได้ insert คอลัมน์นี้)
+
+    # ตัดแถวซ้ำในไฟล์ (ถ้าผู้ใช้อัปโหลดซ้ำกันเอง)
+    df = df.drop_duplicates()
+
+    # -------------------- เตรียมข้อมูลเป็น list ของ dict (เร็วกว่า to_dict ทีละรอบ) --------------------
+    rows = df.to_dict(orient="records")
+
+    # -------------------- หาแถวที่ “มีอยู่แล้ว” ใน DB แบบ batch (JOIN ... VALUES) --------------------
+    from sqlalchemy import values, column, and_
+
+    # สร้างลิสต์ “คีย์ธรรมชาติ” ของ BomWos ที่ใช้ตัดซ้ำ (ยึดตามโค้ดเดิมทุกฟิลด์)
+    key_list = [
+        (
+            r["wosNo"],
+            r["brgNoValue"],
+            r["partNoValue"],
+            r["parentPartNo"],
+            r["partComponentGroup"],
+            r["qty"],
         )
-        db.add(new_item)
-        inserted += 1
-        inserted_rows.append(row)
+        for r in rows
+    ]
 
-    db.commit()
+    # de-dupe keys ในหน่วยความจำอีกชั้น (กันค่าซ้ำในไฟล์)
+    key_list = list(dict.fromkeys(key_list))
 
-    # print insert/skip
-    # print("✅ Inserted Rows:")
-    # pprint(inserted_rows)
+    # เก็บคีย์ที่มีอยู่แล้วใน DB
+    existing_keys = set()
 
-    # print("\n⏭️ Skipped Rows (duplicate lineNo + locationNo):")
-    # pprint(skipped_rows)
+    # ตั้งค่า chunk เพื่อหลบลิมิต 2100 parameters (6 คอลัมน์/แถว -> 350 แถว/ก้อน ≈ 2100)
+    CHUNK = 300  # ปลอดภัย + เผื่อพารามิเตอร์อื่น
 
+    for start in range(0, len(key_list), CHUNK):
+        part = key_list[start:start + CHUNK]
+
+        # สร้าง VALUES table ชั่วคราว (คอลัมน์เรียงให้ตรงกับฝั่งซ้าย)
+        v = values(
+            column('wosNo',               BomWos.wosNo.type),
+            column('brgNoValue',          BomWos.brgNoValue.type),
+            column('partNoValue',         BomWos.partNoValue.type),
+            column('parentPartNo',        BomWos.parentPartNo.type),
+            column('partComponentGroup',  BomWos.partComponentGroup.type),
+            column('qty',                 BomWos.qty.type),
+        ).data(part).alias('v')
+
+        # JOIN กับตารางจริงตามทุกคอลัมน์คีย์
+        q = db.query(
+                BomWos.wosNo,
+                BomWos.brgNoValue,
+                BomWos.partNoValue,
+                BomWos.parentPartNo,
+                BomWos.partComponentGroup,
+                BomWos.qty,
+            ).join(
+                v,
+                and_(
+                    BomWos.wosNo              == v.c.wosNo,
+                    BomWos.brgNoValue         == v.c.brgNoValue,
+                    BomWos.partNoValue        == v.c.partNoValue,
+                    BomWos.parentPartNo       == v.c.parentPartNo,
+                    BomWos.partComponentGroup == v.c.partComponentGroup,
+                    BomWos.qty                == v.c.qty,
+                )
+            )
+
+        # เติมชุดคีย์ที่พบว่ามีอยู่แล้ว
+        existing_keys.update(q.all())
+
+    # -------------------- กรองเฉพาะแถวที่ยังไม่อยู่ใน DB --------------------
+    to_insert = []
+    for r in rows:
+        k = (r["wosNo"], r["brgNoValue"], r["partNoValue"], r["parentPartNo"], r["partComponentGroup"], r["qty"])
+        if k in existing_keys:
+            skipped += 1
+            # skipped_rows.append(r)
+        else:
+            to_insert.append({
+                "wosNo": r["wosNo"],
+                "brgNoValue": r["brgNoValue"],
+                "partNoValue": r["partNoValue"],
+                "partComponentGroup": r["partComponentGroup"],
+                "qty": r["qty"],
+                "parentPartNo": r["parentPartNo"],
+            })
+
+    # -------------------- เขียน DB ด้วย bulk insert ครั้งเดียว --------------------
+    try:
+        if to_insert:
+            # ใช้ bulk insert ผ่าน Core เพื่อความเร็ว (pyodbc + SQL Server เร็วขึ้นอีกถ้าเปิด fast_executemany ตอนสร้าง engine)
+            db.execute(insert(BomWos), to_insert)
+            inserted = len(to_insert)
+            # inserted_rows.extend(to_insert)
+
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+    # -------------------- ส่งผลลัพธ์กลับ --------------------
     return {
         "status": "success",
         "inserted": inserted,
-        "skipped": skipped
+        "skipped": skipped,
+        # "inserted_rows": inserted_rows,
+        # "skipped_rows": skipped_rows,
     }
 
 @app.post("/data_management/machineLayout/upload/")
@@ -214,7 +273,12 @@ async def machineLayout(file: UploadFile = File(...), db: Session = Depends(get_
         inserted += 1
         inserted_rows.append(row)
 
-    db.commit()
+    #ถ้า error ให้ rollback
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Database commit failed: {str(e)}")
 
     # print insert/skip
     # print("✅ Inserted Rows:")
@@ -309,7 +373,12 @@ async def machineGroup(file: UploadFile = File(...), db: Session = Depends(get_d
         inserted += 1
         inserted_rows.append(row)
 
-    db.commit()
+    #ถ้า error ให้ rollback
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Database commit failed: {str(e)}")
 
     # print failed row
     # print("✅ Inserted Rows:")
@@ -388,7 +457,12 @@ async def fac1(file: UploadFile = File(...), db: Session = Depends(get_db)):
         inserted += 1
         inserted_rows.append(row)
 
-    db.commit()
+    #ถ้า error ให้ rollback
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Database commit failed: {str(e)}")
 
     #print fail
     # print("Show fail record")
@@ -467,7 +541,12 @@ async def fac3(file: UploadFile = File(...), db: Session = Depends(get_db)):
         inserted += 1
         inserted_rows.append(row)
 
-    db.commit()
+    #ถ้า error ให้ rollback
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Database commit failed: {str(e)}")
 
     #print fail
     # print("show fail")
@@ -546,7 +625,12 @@ async def sleeveAndThrustBrg(file: UploadFile = File(...), db: Session = Depends
         inserted += 1
         inserted_rows.append(row)
 
-    db.commit()
+    #ถ้า error ให้ rollback
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Database commit failed: {str(e)}")
 
     #print fail
     # print("show fail")
@@ -944,9 +1028,14 @@ async def working_date(file: UploadFile = File(...), db: Session = Depends(get_d
         inserted_WorkingDate += 1
         inserted_rows_WorkingDate.append(row)
 
-    db.commit()
+    #ถ้า error ให้ rollback
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Database commit failed: {str(e)}")
+    
     return {"status": "success"}
-
 
 @app.get("/data_management/bomWos/", response_model=list[dict])
 def get_all_bomWos(db: Session = Depends(get_db)):
@@ -1634,7 +1723,12 @@ async def upload_monthy_files(
         inserted_WipAssy += 1
         inserted_rows_WipAssy.append(row)
 
-    db.commit()
+    #ถ้า error ให้ rollback
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Database commit failed: {str(e)}")
 #-------------------------------------------------------------------------------------------------------------
     return {"status": "success"}
 
@@ -1809,7 +1903,6 @@ def get_all_wip_assy(rev: int | None = None, db: Session = Depends(get_db)):
         for r in rows
     ]
 
-
 @app.post("/data_management/create_plan/upload/")
 async def Insert_plan_data(file: UploadFile = File(...), db: Session = Depends(get_db)): 
     #variable DataPlan
@@ -1874,7 +1967,13 @@ async def Insert_plan_data(file: UploadFile = File(...), db: Session = Depends(g
         inserted_DataPlan += 1
         inserted_rows_DataPlan.append(row)
 
-    db.commit()
+    #ถ้า error ให้ rollback
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Database commit failed: {str(e)}")
+    
     return {"status": "success"}
 
 @app.get("/data_menagement/plan_result/get", response_model=list[dict])
@@ -1948,7 +2047,13 @@ def create_approve_plan(
     ) for r in rows]
 
     db.add_all(items)
-    db.commit()
+    #ถ้า error ให้ rollback
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Database commit failed: {str(e)}")
+    
     return {"status": "ok", "rev": rev, "cleared": deleted, "inserted": len(items)}
 
 @app.get("/data_management/plan_wos_qty/", response_model=list[dict])
@@ -2183,7 +2288,6 @@ def delete_bomwos(item_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"status": "success", "deleted": 1, "id": item_id}
 
-
 # ---------- MASTER: machineLayout ----------
 @app.delete("/data_management/machineLayout/{item_id}")
 def delete_machine_layout(item_id: int, db: Session = Depends(get_db)):
@@ -2199,7 +2303,6 @@ def delete_machine_layout(item_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=409, detail="Cannot delete due to foreign key references")
     return {"status": "success", "deleted": 1, "id": item_id}
 
-
 # ---------- MASTER: machineGroup (ลบในตาราง Machine) ----------
 @app.delete("/data_management/machineGroup/{item_id}")
 def delete_machine(item_id: int, db: Session = Depends(get_db)):
@@ -2213,7 +2316,6 @@ def delete_machine(item_id: int, db: Session = Depends(get_db)):
         db.rollback()
         raise HTTPException(status_code=409, detail="Cannot delete due to foreign key references")
     return {"status": "success", "deleted": 1, "id": item_id}
-
 
 # ---------- MASTER: fac1 / fac3 / sleeveAndThrustBrg (ใช้ PartAssy ตัวเดียวกัน) ----------
 @app.delete("/data_management/fac1/{item_id}")
@@ -2243,7 +2345,6 @@ def delete_sleeve_thrust(item_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"status": "success", "deleted": 1, "id": item_id}
 
-
 # ---------- MASTER: toolLimitAndCapa ----------
 # ใน upload คุณสร้าง Capacity แล้วผูก JoinLimitAssy
 # เพื่อลบแบบง่าย: ลบ JoinLimitAssy ที่ชี้ capacity ก่อน แล้วค่อยลบ Capacity
@@ -2270,8 +2371,6 @@ def delete_working_date(item_id: int, db: Session = Depends(get_db)):
     db.delete(obj)
     db.commit()
     return {"status": "success", "deleted": 1, "id": item_id}
-
-
 
 # ---------- Divition ----------
 # @app.get("/divitions", response_model=list[dict])
