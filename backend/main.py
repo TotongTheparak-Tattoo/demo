@@ -30,8 +30,8 @@ Base.metadata.create_all(bind=engine)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    # "http://192.168.100.124:3001","http://localhost:3000"
+    allow_origins=["http://192.168.100.124:3001"],
+    # "","http://localhost:3000"
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
