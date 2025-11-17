@@ -2,8 +2,11 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-# Copy package files first (for better caching)
-COPY package.json package-lock.json* ./
+# Copy package.json first (required)
+COPY package.json ./
+
+# Copy package-lock.json if it exists (optional)
+COPY package-lock.json* ./
 
 # Install dependencies
 RUN npm install --production=false
