@@ -19,7 +19,9 @@ services:
 
   # Backend Application
   backend:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: wms_backend
     environment:
       - NODE_ENV=production
