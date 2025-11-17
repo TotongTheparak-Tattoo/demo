@@ -7,7 +7,7 @@ README.md
 # app.js
 # initial.js
 package-lock.json
-package.json
+# package.json - should be tracked in git
 # server.js
 migrations
 seeders
