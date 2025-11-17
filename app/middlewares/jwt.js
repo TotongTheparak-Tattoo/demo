@@ -7,11 +7,21 @@ const jwt = require("jsonwebtoken");
 // dotenv.config({ path: envFile });
 
 class JWT {
+  // Get JWT secret with fallback
+  getSecret() {
+    const secret = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-this-in-production';
+    if (!secret || secret.trim() === '') {
+      throw new Error('JWT_SECRET must have a value');
+    }
+    return secret;
+  }
+
   //create jwt toketn for Sign in
   async createToken(empNo, roleName, levelName, signupStatus, divisionId, authId) {
+    const secret = this.getSecret();
     const token = jwt.sign(
       { empNo: empNo, roleName: roleName, levelName: levelName,signupStatus: signupStatus, divisionId: divisionId, authId },
-      process.env.JWT_SECRET,
+      secret,
       {
         expiresIn: "3days",
       }
@@ -29,7 +39,8 @@ class JWT {
     }
 
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const secret = this.getSecret();
+      const decoded = jwt.verify(token, secret);
       req.user = decoded; // Add user info to request
       next(); // Proceed to the next middleware or route handler
     } catch (err) {

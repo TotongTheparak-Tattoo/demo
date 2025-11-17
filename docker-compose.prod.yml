@@ -16,11 +16,11 @@ services:
     networks:
       - wms_network
     healthcheck:
-      test: /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P MicAdmin123! -Q "SELECT 1" || exit 1
+      test: /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P "MicAdmin123!" -Q "SELECT 1" || exit 1
       interval: 10s
-      timeout: 3s
-      retries: 10
-      start_period: 30s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
     restart: unless-stopped
 
   # Redis
@@ -60,7 +60,7 @@ services:
       - ./docker-init-db.js:/app/docker-init-db.js
     depends_on:
       db:
-        condition: service_healthy
+        condition: service_started
       redis:
         condition: service_started
     networks:
