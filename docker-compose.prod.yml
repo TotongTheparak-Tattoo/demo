@@ -15,6 +15,12 @@ services:
       - db_data:/var/opt/mssql
     networks:
       - wms_network
+    healthcheck:
+      test: /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P MicAdmin123! -Q "SELECT 1" || exit 1
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
     restart: unless-stopped
 
   # Redis
@@ -43,6 +49,7 @@ services:
       - DB_PASSWORD=MicAdmin123!
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
     ports:
       - "3001:3001"
     volumes:
@@ -52,8 +59,10 @@ services:
       - ./app.js:/app/app.js
       - ./docker-init-db.js:/app/docker-init-db.js
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
     networks:
       - wms_network
     restart: unless-stopped

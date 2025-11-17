@@ -6,7 +6,7 @@ const config = {
     type: 'default',
     options: {
       userName: process.env.DB_USERNAME || 'sa',
-      password: process.env.DB_PASSWORD || 'YourStrong@Passw0rd',
+      password: process.env.DB_PASSWORD || 'MicAdmin123!',
     }
   },
   options: {
