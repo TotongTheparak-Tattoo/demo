@@ -28,6 +28,7 @@ services:
       - DB_DATABASE=wms_db
       - DB_USERNAME=sa
       - DB_PASSWORD=mic@admin
+      - JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
     ports:
       - "3001:3001"
     volumes:
