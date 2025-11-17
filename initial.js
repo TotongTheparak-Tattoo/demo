@@ -10,6 +10,10 @@ const Maker = db.maker;
 const initDB = async () => {
   try {
     // Force: true will drop the table if it already exists
+    console.log("Starting database sync...");
+    console.log("DB_HOST:", process.env.DB_HOST);
+    console.log("DB_DATABASE:", process.env.DB_DATABASE);
+    console.log("DB_USERNAME:", process.env.DB_USERNAME);
 
     const nodeEnv = (process.env.NODE_ENV || "").trim();
     if (nodeEnv === "test") {
@@ -19,10 +23,12 @@ const initDB = async () => {
       await db.sequelize.sync({ force: false });
     }
 
+    console.log("Database sync completed. Starting initial data...");
     await initialDataForTest();
     console.log("Synced db.");
   } catch (err) {
-    console.log("Failed to sync db: " + err);
+    console.error("Failed to sync db:", err);
+    console.error("Error stack:", err.stack);
   }
 };
 
@@ -30,143 +36,143 @@ const initialDataForTest = async () => {
   // Roles
   const count_vendor = await VendorMaster.count();
   if (count_vendor === 0) {
-    VendorMaster.create({
+    await VendorMaster.create({
       vendorMasterId: 1,
       vendorMasterCode: '2000528',
       vendorMasterName: 'TOYOTA TSUSHO (THAILAND) CO.,LTD.',
       maker: 'Kobe Steel',
     })
-    VendorMaster.create({
+    await VendorMaster.create({
       vendorMasterId: 2,
       vendorMasterCode: '2000196',
       vendorMasterName: 'UMETOKU THAILAND CO.,LTD.',
       maker: 'Proterial',
     })
-    VendorMaster.create({
+    await VendorMaster.create({
       vendorMasterId: 3,
       vendorMasterCode: '1990571',
       vendorMasterName: 'KEIAISHA CO.,LTD.',
       maker: 'Nippon Koshuha',
     })
-    VendorMaster.create({
+    await VendorMaster.create({
       vendorMasterId: 4,
       vendorMasterCode: '2060496',
       vendorMasterName: 'NIPPON STEEL TRADING (THAILAND) CO.,LTD.',
       maker: 'Megasus',
     })
 
-    LocationZone.create({
+    await LocationZone.create({
       locationZoneId: 1,
       zone: 'B',
       type: 'pcs',
     })
-    LocationZone.create({
+    await LocationZone.create({
       locationZoneId: 2,
       zone: 'C',
       type: 'coil',
     })
 
-    Division.create({
+    await Division.create({
       divisionId: 1,
       divisionName: 'MIC',
     })
-    Division.create({
+    await Division.create({
       divisionId: 2,
       divisionName: 'Toyota Tsusho',
     })
-    Division.create({
+    await Division.create({
       divisionId: 3,
       divisionName: 'Umetoku',
     })
-    Division.create({
+    await Division.create({
       divisionId: 4,
       divisionName: 'KI',
     })
 
-    Role.create({
+    await Role.create({
       roleId: 1,
       roleName: 'warehouse'
     })
    
-    Level.create({
+    await Level.create({
       levelId : 1,
       levelName : 'admin'
     })
-    Level.create({
+    await Level.create({
       levelId : 2,
       levelName : 'staff'
     })
-    Level.create({
+    await Level.create({
       levelId : 3,
       levelName : 'operator'
     })
 
-    Maker.create({
+    await Maker.create({
       makerId: 1,
       makerName: 'Proterial',
     })
-    Maker.create({
+    await Maker.create({
       makerId: 2,
       makerName: 'Nippon Koshuha',
     })
-    Maker.create({
+    await Maker.create({
       makerId: 3,
       makerName: 'Fuji Shaft',
     })
-    Maker.create({
+    await Maker.create({
       makerId: 4,
       makerName: 'Fujikoshi',
     })
-    Maker.create({
+    await Maker.create({
       makerId: 5,
       makerName: 'Megasus',
     })
-    Maker.create({
+    await Maker.create({
       makerId: 6,
       makerName: 'Sanyu',
     })
-    Maker.create({
+    await Maker.create({
       makerId: 7,
       makerName: 'Numazu',
     })
-    Maker.create({
+    await Maker.create({
       makerId: 8,
       makerName: 'Kobe Steel',
     })
 
-    ProductStatus.create({
+    await ProductStatus.create({
       productStatusId: 1,
       productStatusName: 'receive',
     })
-    ProductStatus.create({
+    await ProductStatus.create({
       productStatusId: 2,
       productStatusName: 'put away',
     })
-    ProductStatus.create({
+    await ProductStatus.create({
       productStatusId: 3,
       productStatusName: 'picking',
     })
-    ProductStatus.create({
+    await ProductStatus.create({
       productStatusId: 4,
       productStatusName: 'pre information',
     })
-    ProductStatus.create({
+    await ProductStatus.create({
       productStatusId: 5,
       productStatusName: 'loading',
     })
-    ProductStatus.create({
+    await ProductStatus.create({
       productStatusId: 6,
       productStatusName: 'void',
     })
-    ProductStatus.create({
+    await ProductStatus.create({
       productStatusId: 7,
       productStatusName: 'change location',
     })
-    ProductStatus.create({
+    await ProductStatus.create({
       productStatusId: 8,
       productStatusName: 'return',
     })
-    ProductStatus.create({
+    await ProductStatus.create({
       productStatusId: 9,
       productStatusName: 'export',
     })

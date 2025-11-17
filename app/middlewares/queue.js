@@ -6,9 +6,15 @@ const REDIS_SETUP = {
         port: process.env.REDIS_PORT || 6379,
     }
 }
-//naming queue uniquely is recommended before the deployment.
-const queueList = {
-    "receiveAutoQueueCoil": new BeeQueue("1_bpi_wms_vmi_receive_auto_coil_production", REDIS_SETUP).process(async (job) => {
+
+// Initialize queues with error handling
+let queueList = {};
+
+const initializeQueues = () => {
+    try {
+        //naming queue uniquely is recommended before the deployment.
+        queueList = {
+            "receiveAutoQueueCoil": new BeeQueue("1_bpi_wms_vmi_receive_auto_coil_production", REDIS_SETUP).process(async (job) => {
         const { getProductDetailsData, matchedData, getAvailableLocation } = job.data
         const result = await InboundService.doInboundReceiveCoilAuto(getProductDetailsData, matchedData, getAvailableLocation)
         
@@ -64,11 +70,32 @@ const queueList = {
             "printData": printData
         }
     })
+    }
+    
+    // Handle Redis connection errors
+    Object.values(queueList).forEach(queue => {
+        queue.on('error', (err) => {
+            console.error('Queue error:', err);
+        });
+    });
+    
+    console.log('Queues initialized successfully');
+    } catch (error) {
+        console.error('Failed to initialize queues:', error);
+        console.error('Queue functionality will be disabled');
+    }
 }
+
+// Initialize queues
+initializeQueues();
 
 class Queue {
     async doProcess(queueName, data) {
         try {
+            if (!queueList[queueName]) {
+                throw new Error(`Queue ${queueName} is not initialized. Redis may not be available.`);
+            }
+            
             const queueInstance = queueList[queueName]
             
             const job = queueInstance.createJob(data)

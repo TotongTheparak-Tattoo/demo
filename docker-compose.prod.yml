@@ -17,6 +17,17 @@ services:
       - wms_network
     restart: unless-stopped
 
+  # Redis
+  redis:
+    image: redis:7-alpine
+    container_name: wms_redis
+    ports:
+      - "6379:6379"
+    networks:
+      - wms_network
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
   # Backend Application
   backend:
     build:
@@ -30,6 +41,8 @@ services:
       - DB_DATABASE=wms_db
       - DB_USERNAME=sa
       - DB_PASSWORD=MicAdmin123!
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
     ports:
       - "3001:3001"
     volumes:
@@ -40,6 +53,7 @@ services:
       - ./docker-init-db.js:/app/docker-init-db.js
     depends_on:
       - db
+      - redis
     networks:
       - wms_network
     restart: unless-stopped
