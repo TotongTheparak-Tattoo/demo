@@ -7,7 +7,7 @@ services:
     container_name: wms_db
     environment:
       - ACCEPT_EULA=Y
-      - MSSQL_SA_PASSWORD=mic@admin
+      - MSSQL_SA_PASSWORD=Mic@Admin123
       - MSSQL_PID=Express
     ports:
       - "1433:1433"
@@ -16,12 +16,6 @@ services:
     networks:
       - wms_network
     restart: unless-stopped
-    healthcheck:
-      test: /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "mic@admin" -Q "SELECT 1" -C || exit 1
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 30s
 
   # Backend Application
   backend:
@@ -35,7 +29,7 @@ services:
       - DB_HOST=db
       - DB_DATABASE=wms_db
       - DB_USERNAME=sa
-      - DB_PASSWORD=mic@admin
+      - DB_PASSWORD=Mic@Admin123
     ports:
       - "3001:3001"
     volumes:
@@ -45,8 +39,7 @@ services:
       - ./app.js:/app/app.js
       - ./docker-init-db.js:/app/docker-init-db.js
     depends_on:
-      db:
-        condition: service_healthy
+      - db
     networks:
       - wms_network
     restart: unless-stopped
