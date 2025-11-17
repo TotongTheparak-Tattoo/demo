@@ -15,7 +15,7 @@ services:
       - db_data:/var/opt/mssql
     networks:
       - wms_network
-    # Healthcheck removed - backend will wait for DB using docker-init-db.js
+    restart: unless-stopped
 
   # Backend Application
   backend:

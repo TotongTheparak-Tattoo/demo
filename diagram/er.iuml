@@ -1,0 +1,333 @@
+@startuml
+
+skinparam linetype ortho
+left to right direction
+entity "VendorMaster" as vendorMaster {
+    * vendorMasterId : int
+    --
+    vendorMasterCode : varchar(7) <<unique>>
+    vendorMasterName : varchar(50) <<unique>>
+}
+
+entity "ProductStatus" as productStatus {
+    * productStatusId : int
+    --
+    productStatusName : varchar(20) <<unique>>
+}
+
+entity "Location" as location {
+    * locationId : int
+    --
+    locationCode : varchar(10) <<unique>>
+    rack : varchar(3)
+    bay : varchar(1)
+    shelf : int
+    subBay : int
+    subLocation : int
+    weight : int
+    locationZoneId : int <<fk>>
+   }   
+entity "LocationZone" as locationZone {
+    * locationZoneId : int
+    --
+    zone : varchar(1) <<unique>>
+    type : varchar(10)
+   }   
+entity "ProductDetails" as productDetails {
+    * productDetailsId : int
+    --
+    registered_at : datetime <<auto create>>
+    updated_at : datetime <<auto insert and auto update>>
+    mfgDate : date
+    boxNo: varchar(50) 
+    masterInvoiceNo : varchar(30) <<compound key>>
+    caseNo: varchar(10) <<compound key>>
+    poNo: varchar(30)
+    lotNo: varchar(30) <<compound key>>
+    heatNo: varchar(30)
+    itemName : varchar(30)
+    spec: varchar(50) <<compound key>>
+    size: varchar(30) <<compound key>>
+    quantity: int
+    unit: varchar(5)
+    width: int
+    currency: varchar(5)
+    unitPrice: float
+    amount: float
+    netWeight: int
+    grossWeight: int
+    importEntryNo: varchar(20)
+    remark:varchar(100)
+    vendorMasterId : int <<fk>> 
+}
+entity "ProductLog" as productLog {
+    * productLogId : int
+    --
+    registered_at : datetime <<auto create>>
+    palletNo : int
+    mfgDate : date
+    ProductDetailsId : int <<fk>> <<compound key>>
+    productStatusId : int <<fk>>  <<compound key>>
+    locationId : int <<fk>> 
+    mrRequestId : int <<fk>> 
+
+}
+
+entity "ProductBalance" as productBalance {
+    * productBalanceId : int
+    --
+    registered_at : datetime <<auto create>>
+    updated_at : datetime <<auto insert and auto update>>
+    palletNo : int
+    mfgDate : date
+    ProductDetailsId : int <<fk>> <<unique>>
+    productStatusId : int <<fk>>
+    locationId : int <<fk>> default = null
+    mrRequestId : int <<fk>> default = null
+}
+
+entity "itemList" as itemList {
+    * itemListId : int
+    --
+    registered_at : datetime <<auto create>>
+    spec: varchar(50) <<compound key>>
+    dia:  varchar(30)
+    length: varchar(20)
+    size: varchar(30) <<compound key>>
+    l : int
+    w : int
+    h : int
+    weight : int
+    subLocation : int
+    vendorMasterId : int <<fk>>
+    locationZoneId : int <<fk>>
+    makerId : int <<fk>>
+}
+
+entity "MRRequest" as mrRequest {
+    * mrRequestId : int
+    --
+    registered_at : datetime <<auto create>>
+    updated_at : datetime <<auto insert and auto update>>
+    mrNo : varchar(50)
+    requestDate: date
+    deliveryTo: varchar(30)
+    partialInvoice: varchar(30)
+    masterInvoiceNo: varchar(30) <<compound key>>
+    caseNo: varchar(10) <<compound key>>
+    poNo: varchar(30)
+    lotNo: varchar(30) <<compound key>>
+    description: varchar(30)
+    spec: varchar(50) <<compound key>>
+    size: varchar(30) <<compound key>>
+    quantity: int
+    unit: varchar(5)
+    netWeight: int
+    grossWeight: int
+    exportEntryNo: varchar(20)
+    remark:varchar(100)
+    vendorMasterId : int <<fk>> 
+}
+entity "MRRequestLog" as mrRequestLog {
+    * mrRequestLogId : int
+    --
+    registered_at : datetime <<auto create>>
+    updated_at : datetime <<auto insert and auto update>>
+    mrNo : varchar(50)
+    mrNoDate : varchar(30)
+    mrNoIncrement : varchar(30)
+    stockOutDate : varchar(30)
+    invoiceNo_MasterLot : varchar(30) <<compound key>>
+    invoiceNo_PartialInv : varchar(30)
+    nmbPoNo : varchar(30)
+    itemName : varchar(30)
+    itemNo: varchar(30)
+    lotNo: varchar(30)
+    caseNo: varchar(10) <<compound key>>
+    spec: varchar(50) <<compound key>>
+    size: varchar(30) <<compound key>>
+    quantity: int
+    unit: varchar(5)
+    exportEntryNo: varchar(20)
+    remark:varchar(100)
+    productStatusId : productStatusId : int <<fk>>
+    locationId : int <<fk>>
+    vendorMasterId : int <<fk>> 
+}
+
+entity "Authentication" as authentication {
+    * authId : int
+    --
+    registered_at : datetime <<auto create>>
+    updated_at : datetime <<auto insert and auto update>>
+    empNo: varchar(10)
+    password: varchar(MAX)
+    email: varchar(50)
+    signupStatus: varchar(10)
+    levelId : int <<fk>> 
+    roleId : int <<fk>> 
+    divisionId : int <<fk>> 
+}
+entity "Role" as role {
+    * roleId : int
+    --
+    registered_at : datetime <<auto create>>
+    roleName : varchar(15)
+}
+entity "Level" as level {
+    * levelId : int
+    --
+    registered_at : datetime <<auto create>>
+    levelName : varchar(15)
+}
+
+entity "Division" as division {
+    * divisionId : int
+    --
+    registered_at : datetime <<auto create>>
+    divisionName : varchar(15)
+}
+
+entity "Maker" as maker {
+    * makerId : int
+    --
+    makerName : varchar(20)
+}
+
+entity "MonthlyData" as MonthlyData {
+    * monthlyDataId : int
+    --
+    registered_at : datetime <<auto create>>
+    updated_at : datetime <<auto insert and auto update>>
+    invoiceNo  : varchar(10)
+    itemNo : int
+    importerNameEN : varchar(50)
+    description : varchar(50)
+    quantity : float
+    unit : varchar(10)
+    netWeight : float
+    netWeightUnit : varchar(10)
+    currency : varchar(10)
+    amount : float
+    cifTHB : float
+    dutyRate : float
+    dutyAmt : float
+    tariff : varchar(20)
+    ctrlDeclarationNo : varchar(20)
+    consignmentCountry : varchar(10)
+    netWeight : float
+    netWeightUnit : varchar(10)
+    grossWeight : float
+    grossWeightUnit : varchar(10)
+    currencyCode : varchar(10)
+    invoiceCurrency : varchar(10)
+    arrivalDate : date
+}
+
+entity "MonthlyDataLog" as MonthlyDataLog {
+    * monthlyDataLogId : int
+    --
+    registered_at : datetime <<auto create>>
+    updated_at : datetime <<auto insert and auto update>>
+    invoiceNo  : varchar(10)
+    itemNo : int
+    importerNameEN : varchar(50)
+    description : varchar(50)
+    quantity : float
+    unit : varchar(10)
+    netWeight : float
+    netWeightUnit : varchar(10)
+    currency : varchar(10)
+    amount : float
+    cifTHB : float
+    dutyRate : float
+    dutyAmt : float
+    tariff : varchar(20)
+    ctrlDeclarationNo : varchar(20)
+    consignmentCountry : varchar(10)
+    netWeight : float
+    netWeightUnit : varchar(10)
+    grossWeight : float
+    grossWeightUnit : varchar(10)
+    currencyCode : varchar(10)
+    invoiceCurrency : varchar(10)
+    arrivalDate : date
+    action : varchar(10)
+}
+
+entity "TransactionMovement" as TransactionMovement {
+    * transactionMovementId : int
+    --
+    registered_at : datetime <<auto create>>
+    updated_at : datetime <<auto insert and auto update>>
+    invoiceNo  : varchar(10)
+    itemNo : int
+    exporterNameEN : varchar(50)
+    description : varchar(255)
+    quantity : float
+    unit : varchar(10)
+    netWeight : float
+    netWeightUnit : varchar(10)
+    grossWeight : float
+    grossWeightUnit : varchar(10)
+    remarks : varchar(255)
+    declarationNo : varchar(20)
+    declarationLineNumber : int
+    ctrlDeclarationNo : varchar(20)
+}
+
+entity "TransactionMovementLog" as TransactionMovementLog {
+    * transactionMovementLogId : int
+    --
+    registered_at : datetime <<auto create>>
+    updated_at : datetime <<auto insert and auto update>>
+    invoiceNo  : varchar(10)
+    itemNo : int
+    exporterNameEN : varchar(50)
+    description : varchar(255)
+    quantity : float
+    unit : varchar(10)
+    netWeight : float
+    netWeightUnit : varchar(10)
+    grossWeight : float
+    grossWeightUnit : varchar(10)
+    remarks : varchar(255)
+    declarationNo : varchar(20)
+    declarationLineNumber : int
+    ctrlDeclarationNo : varchar(20)
+    action : varchar(10)
+}
+
+
+
+vendorMaster }|..|| productDetails
+vendorMaster }|..|| mrRequestLog
+
+division }|..|| authentication
+
+productDetails ||..|| productBalance
+location ||..|| productBalance
+
+productStatus }|..|| productBalance
+
+mrRequest }|..|{ productBalance
+mrRequest }|..|| vendorMaster
+
+mrRequestLog }|..|| location
+mrRequestLog }|..|| productStatus
+
+
+locationZone }|..|| location
+
+authentication }|..|{ role
+authentication }|..|{ level
+
+productLog }|..|| productDetails
+productLog }|..|| productStatus
+productLog }|..|| location
+
+vendorMaster }|..|| itemList
+locationZone }|..|| itemList
+maker }|..|| itemList
+
+@enduml

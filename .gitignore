@@ -1,0 +1,13 @@
+node_modules
+README.md
+# diagram
+.env.production
+.env.test
+.env.dev
+# app.js
+# initial.js
+package-lock.json
+package.json
+# server.js
+migrations
+seeders

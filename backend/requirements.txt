@@ -1,8 +1,0 @@
-fastapi
-uvicorn
-sqlalchemy
-pandas
-python-dateutil
-pyodbc
-pydantic
-python-multipart
