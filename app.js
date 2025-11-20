@@ -28,7 +28,6 @@ app.get("/", (req, res) => {
 });
 
 //use the routes
-require("./app/routes/authentication.routes")(app);
 require("./app/routes/division.routes")(app);
 require("./app/routes/upload.routes")(app);
 require("./app/routes/inbound.routes")(app);

@@ -36,7 +36,6 @@ db.role = require("./role.model.js")(sequelize, Sequelize);
 db.vendorMaster = require("./vendorMaster.model.js")(sequelize, Sequelize);
 db.locationZone = require("./locationZone.model.js")(sequelize, Sequelize);
 db.productStatus = require('./productStatus.model.js')(sequelize, Sequelize)
-db.authenication = require("./authentication.model.js")(sequelize, Sequelize);
 db.location = require("./location.model.js")(sequelize, Sequelize);
 db.itemList = require("./itemList.model.js")(sequelize, Sequelize)
 db.productDetails = require("./productDetails.model.js")(sequelize, Sequelize)
@@ -54,9 +53,6 @@ db.transactionMovementLog = require("./transactionMovementLog.model.js")(sequeli
 
 //relationship (belongsToModel, hasManyModel, fk)
 
-
-dbConfig.CreateAssociationOneToMany(db.authenication, db.role, "roleId");
-dbConfig.CreateAssociationOneToMany(db.authenication, db.level, "levelId");
 
 dbConfig.CreateAssociationOneToMany(db.location, db.locationZone, "locationZoneId");
 dbConfig.CreateAssociationOneToMany(db.productDetails, db.vendorMaster, "vendorMasterId")

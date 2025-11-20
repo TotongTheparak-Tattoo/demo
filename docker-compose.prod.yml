@@ -23,17 +23,6 @@ services:
       start_period: 60s
     restart: unless-stopped
 
-  # Redis
-  redis:
-    image: redis:7-alpine
-    container_name: wms_redis
-    ports:
-      - "6379:6379"
-    networks:
-      - wms_network
-    restart: unless-stopped
-    command: redis-server --appendonly yes
-
   # Backend Application
   backend:
     build:
@@ -47,8 +36,6 @@ services:
       - DB_DATABASE=wms_db
       - DB_USERNAME=sa
       - DB_PASSWORD=MicAdmin123!
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
       - JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
     ports:
       - "3001:3001"
@@ -60,9 +47,7 @@ services:
       - ./docker-init-db.js:/app/docker-init-db.js
     depends_on:
       db:
-        condition: service_started
-      redis:
-        condition: service_started
+        condition: service_healthy
     networks:
       - wms_network
     restart: unless-stopped

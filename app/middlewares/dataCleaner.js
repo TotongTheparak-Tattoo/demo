@@ -1,54 +1,5 @@
-const bcrypt = require("bcrypt");
 const { ValidationErrorItemOrigin } = require("sequelize");
 
-class AuthenticationDataCleaner {
-  async getAllAccount(data) {
-    let cleanData = [];
-    for (let i = 0; i < data.length; i++) {
-      cleanData.push({
-        emp_no: data[i].emp_no.toLowerCase(),
-        email: data[i].email,
-        divisionId: data[i].divisionId,
-        role_id: data[i].role_id,
-        role: data[i]["Role.role"],
-        divisionName: data[i]["Division.divisionName"],
-        auth_id: data[i].auth_id,
-        signup_status: data[i].signup_status,
-      });
-    }
-    return cleanData;
-  }
-  //prepare data for sign up
-  async prepareSignup(data) {
-    const data_clean = {
-      empNo: data.emp_no.toLowerCase(),
-      password: bcrypt.hashSync(data.password, bcrypt.genSaltSync()),
-      email: data.email,
-      divisionId: data.divisionId,
-      roleId: data.role_id,
-      levelId: data.level_id,
-    };
-    return data_clean;
-  }
-  //prepare data for login
-  async prepareLogin(data) {
-    const data_clean = {
-      emp_no: data.emp_no.toLowerCase(),
-    };
-
-    return data_clean;
-  }
-
-  //prepare data for change password
-  async prepareChangePassword(data) {
-    const data_clean = {
-      emp_no: data.emp_no.toLowerCase(),
-      new_password: bcrypt.hashSync(data.new_password, bcrypt.genSaltSync()),
-    };
-
-    return data_clean;
-  }
-}
 class UploadDataCleaner {
   constructor() {
     this.runNumberMap = new Map(); // เก็บ run number สำหรับแต่ละ Master lot Invoice No.
@@ -273,7 +224,6 @@ class InboundDataCleaner {
 }
 
 module.exports = {
-  Authentication: new AuthenticationDataCleaner(),
   Upload: new UploadDataCleaner(),
   Inbound: new InboundDataCleaner(),
 };

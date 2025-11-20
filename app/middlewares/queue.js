@@ -1,21 +1,9 @@
-const BeeQueue = require("bee-queue")
 const InboundService = require("../services/inbound.service")
-const REDIS_SETUP = {
-    redis: {
-        host: process.env.REDIS_HOST || 'localhost',
-        port: process.env.REDIS_PORT || 6379,
-    }
-}
 
-// Initialize queues with error handling
-let queueList = {};
-
-const initializeQueues = () => {
-    try {
-        //naming queue uniquely is recommended before the deployment.
-        queueList = {
-            "receiveAutoQueueCoil": new BeeQueue("1_bpi_wms_vmi_receive_auto_coil_production", REDIS_SETUP).process(async (job) => {
-        const { getProductDetailsData, matchedData, getAvailableLocation } = job.data
+// Process handlers without Redis queue (synchronous execution)
+const processHandlers = {
+    "receiveAutoQueueCoil": async (data) => {
+        const { getProductDetailsData, matchedData, getAvailableLocation } = data
         const result = await InboundService.doInboundReceiveCoilAuto(getProductDetailsData, matchedData, getAvailableLocation)
         
         let printData = null;
@@ -27,9 +15,9 @@ const initializeQueues = () => {
             "status": result,
             "printData": printData
         }
-    }),
-    "receiveAutoQueuePcs": new BeeQueue("2_bpi_wms_vmi_receive_auto_pcs_production", REDIS_SETUP).process(async (job) => {
-        const { getProductDetailsData, matchedData, getAvailableLocation } = job.data
+    },
+    "receiveAutoQueuePcs": async (data) => {
+        const { getProductDetailsData, matchedData, getAvailableLocation } = data
         const result = await InboundService.doInboundReceivePcsAuto(getProductDetailsData, matchedData, getAvailableLocation)
         
         let printData = null;
@@ -41,9 +29,9 @@ const initializeQueues = () => {
             "status": result,
             "printData": printData
         }
-    }),
-    "receiveManualQueueCoil": new BeeQueue("3_bpi_wms_vmi_receive_manual_coil_production", REDIS_SETUP).process(async (job) => {
-        const { getProductDetailsData, matchedData, getLocationById } = job.data
+    },
+    "receiveManualQueueCoil": async (data) => {
+        const { getProductDetailsData, matchedData, getLocationById } = data
         const result = await InboundService.doInboundReceiveManualCoil(getProductDetailsData, matchedData, getLocationById)
         
         let printData = null;
@@ -55,9 +43,9 @@ const initializeQueues = () => {
             "status": result,
             "printData": printData
         }
-    }),
-    "receiveManualQueuePcs": new BeeQueue("4_bpi_wms_vmi_receive_manual_pcs_production", REDIS_SETUP).process(async (job) => {
-        const { getProductDetailsData, matchedData, getLocationById } = job.data
+    },
+    "receiveManualQueuePcs": async (data) => {
+        const { getProductDetailsData, matchedData, getLocationById } = data
         const result = await InboundService.doInboundReceiveManualPcs(getProductDetailsData, matchedData, getLocationById)
         
         let printData = null;
@@ -69,54 +57,20 @@ const initializeQueues = () => {
             "status": result,
             "printData": printData
         }
-    })
-    }
-    
-    // Handle Redis connection errors
-    Object.values(queueList).forEach(queue => {
-        queue.on('error', (err) => {
-            console.error('Queue error:', err);
-        });
-    });
-    
-    console.log('Queues initialized successfully');
-    } catch (error) {
-        console.error('Failed to initialize queues:', error);
-        console.error('Queue functionality will be disabled');
     }
 }
-
-// Initialize queues
-initializeQueues();
 
 class Queue {
     async doProcess(queueName, data) {
         try {
-            if (!queueList[queueName]) {
-                throw new Error(`Queue ${queueName} is not initialized. Redis may not be available.`);
+            const handler = processHandlers[queueName]
+            
+            if (!handler) {
+                throw new Error(`Unknown queue name: ${queueName}`)
             }
             
-            const queueInstance = queueList[queueName]
-            
-            const job = queueInstance.createJob(data)
-            await job.save()
-            
-            // use Promise and event listeners for BeeQueue
-            const result = await new Promise((resolve, reject) => {
-                job.on('succeeded', (result) => {
-                    console.log("Job succeeded with result:", result)
-                    resolve(result)
-                })
-                
-                job.on('failed', (error) => {
-                    console.log("Job failed with error:", error)
-                    reject(error)
-                })
-                
-                setTimeout(() => {
-                    reject(new Error('Job timeout'))
-                }, 30000) 
-            })
+            // Execute synchronously without Redis queue
+            const result = await handler(data)
             
             return { 
                 success: true, 
