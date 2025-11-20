@@ -1,4 +1,5 @@
 const locationController = require("../controllers/location.controller");
+const JWT = require("../middlewares/jwt");
 
 module.exports = function (app) {
   app.get(
@@ -12,6 +13,8 @@ module.exports = function (app) {
   );
   app.get(
     "/api/v1/location/get_available_location",
+    // JWT.verifyToken, 
+    // JWT.isUserAndAdmin, 
     locationController.getAvailableLocation
   );
   app.post(
