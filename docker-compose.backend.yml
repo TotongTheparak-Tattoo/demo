@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  # Backend Application - เชื่อมต่อกับ DB ที่รันอยู่แล้ว
+  backend:
+    build: .
+    container_name: wms_backend
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - DB_HOST=wms_db  # ใช้ container name ของ DB
+      - DB_DATABASE=wms_db
+      - DB_USERNAME=sa
+      - DB_PASSWORD=mic@admin
+      - JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./app:/app/app
+      - ./initial.js:/app/initial.js
+      - ./server.js:/app/server.js
+      - ./app.js:/app/app.js
+      - ./docker-init-db.js:/app/docker-init-db.js
+    networks:
+      - wms_network  # ใช้ network เดียวกับ DB
+    restart: unless-stopped
+
+networks:
+  wms_network:
+    external: true  # ใช้ network ที่สร้างไว้แล้วจาก docker-compose.db.yml
+    name: wms_network
+

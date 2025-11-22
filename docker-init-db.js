@@ -1,12 +1,12 @@
 const { Connection, Request } = require('tedious');
 
 const config = {
-  server: process.env.DB_HOST || 'db',
+  server: process.env.DB_HOST || 'wms_db', // ใช้ container name หรือ host
   authentication: {
     type: 'default',
     options: {
       userName: process.env.DB_USERNAME || 'sa',
-      password: process.env.DB_PASSWORD || 'MicAdmin123!',
+      password: process.env.DB_PASSWORD || 'mic@admin',
     }
   },
   options: {
@@ -60,6 +60,9 @@ const createDatabase = () => {
 const waitForDatabase = async () => {
   const maxRetries = 30;
   const retryDelay = 2000; // 2 seconds
+  const dbHost = process.env.DB_HOST || 'wms_db';
+  
+  console.log(`Connecting to SQL Server at: ${dbHost}`);
   
   for (let i = 0; i < maxRetries; i++) {
     try {
@@ -68,10 +71,11 @@ const waitForDatabase = async () => {
       process.exit(0);
     } catch (err) {
       if (i < maxRetries - 1) {
-        console.log(`Waiting for SQL Server... (${i + 1}/${maxRetries})`);
+        console.log(`Waiting for SQL Server at ${dbHost}... (${i + 1}/${maxRetries})`);
         await new Promise(resolve => setTimeout(resolve, retryDelay));
       } else {
         console.error('Failed to initialize database after retries:', err);
+        console.error(`Make sure SQL Server is running at: ${dbHost}`);
         process.exit(1);
       }
     }

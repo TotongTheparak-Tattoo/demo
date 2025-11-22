@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  # SQL Server Database - รันแยก
+  db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: wms_db
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=mic@admin
+      - MSSQL_PID=Express
+    ports:
+      - "1433:1433"
+    volumes:
+      - db_data:/var/opt/mssql
+    networks:
+      - wms_network
+    restart: unless-stopped
+
+volumes:
+  db_data:
+    driver: local
+
+networks:
+  wms_network:
+    driver: bridge
+    name: wms_network
+
